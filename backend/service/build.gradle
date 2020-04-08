@@ -1,0 +1,16 @@
+dependencies {
+  implementation "javax.validation:validation-api:$javax_validation_ver"
+  implementation "org.springframework:spring-tx:$spring_ver"
+
+  implementation "org.mapstruct:mapstruct-jdk8:$mapstruct_ver"
+  annotationProcessor "org.mapstruct:mapstruct-processor:$mapstruct_ver"
+
+  implementation project(":repository")
+}
+
+compileJava {
+  options.compilerArgs += [
+      '-Amapstruct.defaultComponentModel=spring',
+      '-Amapstruct.unmappedTargetPolicy=ERROR'
+  ]
+}

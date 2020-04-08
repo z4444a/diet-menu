@@ -1,0 +1,193 @@
+buildscript {
+  ext {
+    spotbugs_ver = "1.6.5"
+    pmd_tool_ver = "6.11.0"
+    checkstyle_ver = "8.17"
+    spotbugs_tool_ver = "3.1.8"
+    jaxb_ver = "2.3.0"
+  }
+}
+
+plugins {
+  id 'java'
+  id "org.springframework.boot" version "2.1.2.RELEASE"
+}
+
+
+subprojects {
+  apply {
+    plugin 'java-library'
+  }
+}
+
+
+allprojects {
+  apply {
+    plugin 'pmd'
+    plugin 'checkstyle'
+    plugin 'jacoco'
+    plugin 'idea'
+  }
+
+  ext { //provides correct versions for pmd and compiler transitive dependencies to generate no warnings
+    //logging
+    slf4j_ver = "1.7.25"
+    logback_ver = "1.2.3"
+
+    //testing
+    junit_ver = "5.4.0"
+    mockito_ver = "2.24.0"
+
+    //apt
+    mapstruct_ver = '1.2.0.Final'
+
+    //spring
+    spring_ver = "5.1.2.RELEASE"
+    spring_data_ver = "2.1.3.RELEASE"
+    springboot_ver = "2.1.2.RELEASE"
+
+    //db
+    postgre_ver = '42.2.5'
+    hibernate_orm_ver = "5.4.1.Final"
+    liquibase_ver = "3.6.2"
+
+    javax_http_ver = "4.0.1"
+    javax_validation_ver = "2.0.1.Final"
+
+    snakeyaml_ver = "1.23"
+    hibernate_validator_ver = "6.0.13.Final"
+    aspectj_ver = "1.9.2"
+    jjwt_ver = '0.10.5'
+    springfox_ver = "2.9.2"
+    jaxb_ver = "2.3.0"
+    jackson_ver = "2.9.8"
+    springfox_ver = "2.9.2"
+  }
+
+
+  version = "0.1.0"
+  group = "ru.relex"
+  sourceCompatibility = 11
+  targetCompatibility = 11
+
+  repositories {
+    mavenCentral()
+    jcenter()
+  }
+
+  pmd {
+    ignoreFailures = true
+    rulePriority = 3
+    toolVersion = pmd_tool_ver
+    pmdTest.enabled = false
+    sourceSets = [sourceSets.main]
+    ruleSets = []
+    ruleSetFiles = files("${rootProject.projectDir}/config/pmd.xml")
+    pmdMain {
+      reports {
+        html.enabled = false
+        xml.enabled = true
+      }
+    }
+  }
+
+  checkstyle {
+    ignoreFailures = true
+    config = resources.text.fromFile("${rootProject.projectDir}/config/checkstyle.xml")
+    maxWarnings = 100
+    toolVersion = "8.17"
+    sourceSets = [sourceSets.main]
+    showViolations = false
+    checkstyleTest.enabled = false
+    checkstyleMain {
+      reports {
+        html.enabled = false
+      }
+    }
+  }
+
+  jacoco {
+    toolVersion = "0.8.2"
+  }
+
+  task lint {} // enpty task to aggregate checkstyle/pmd/spotbugs linting
+
+  lint.dependsOn pmdMain, checkstyleMain
+
+  jacocoTestReport {
+    reports {
+      xml.enabled true
+      csv.enabled false
+    }
+  }
+
+  configurations.all {
+    resolutionStrategy {
+      dependencySubstitution {
+        substitute module('commons-logging:commons-logging') with module("org.slf4j:jcl-over-slf4j:$slf4j_ver")
+        substitute module('org.codehaus.woodstox:woodstox-core-asl') with module("com.fasterxml.woodstox:woodstox-core:5.0.3")
+      }
+      force "com.google.guava:guava:20.0"
+    }
+
+    exclude group: "org.mapstruct", module: "mapstruct" //we use jdk8 mapper
+    exclude group: "com.google.code.findbugs"
+    exclude group: "org.jboss.spec.javax.transaction", module: "jboss-transaction-api_1.2_spec"
+    exclude group: "org.hibernate.javax.persistence", module: "hibernate-jpa-2.0-api"
+  }
+
+  dependencies {
+    implementation "org.slf4j:slf4j-api:$slf4j_ver"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junit_ver"
+    testImplementation "org.mockito:mockito-core:$mockito_ver"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junit_ver"
+  }
+
+  test {
+    useJUnitPlatform()
+  }
+
+  each {
+    if (it.name != 'commons') {
+      dependencies {
+        implementation project(":commons")
+        implementation "org.springframework:spring-context:$spring_ver"
+      }
+    }
+  }
+}
+
+dependencies {
+  runtimeOnly "ch.qos.logback:logback-classic:$logback_ver"
+  implementation("org.springframework.boot:spring-boot-starter-web:$springboot_ver") {
+    exclude group: "org.springframework.boot", module: "spring-boot-starter-tomcat"
+  }
+  compileOnly "javax.servlet:javax.servlet-api:$javax_http_ver"
+  runtimeOnly "org.springframework.boot:spring-boot-starter-undertow:$springboot_ver"
+
+  implementation "io.springfox:springfox-swagger2:$springfox_ver"
+  implementation "io.springfox:springfox-swagger-ui:$springfox_ver"
+}
+
+
+springBoot {
+  mainClassName = 'amm.vsu.dm.rest.DMApp'
+}
+
+bootJar {
+  launchScript()
+}
+
+task mergeJacocoReports(type: JacocoMerge) {
+  executionData = project.fileTree(dir: '.', include: '**/build/jacoco/test.exec')
+  destinationFile = new File("${rootProject.buildDir}/reports/jacoco/AggregatedCoverage.exec")
+}
+
+allprojects {
+  mergeJacocoReports.dependsOn jacocoTestCoverageVerification
+}
+
+dependencies {
+  implementation project(":service")
+  implementation project(":security")
+}
